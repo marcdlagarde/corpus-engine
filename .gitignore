@@ -1,0 +1,39 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Local user state
+*.tmp
+*.bak
+*.log
+
+# Secrets - never commit
+.env
+.env.*
+*.pem
+secrets*.json
+
+# DO NOT commit anyone's actual corpus contents.
+# If you point the tools at this repo as your corpus root, the runtime files
+# below will appear and should NEVER be committed publicly.
+_RAW_PROMPT_LOG.md
+_raw-*.md
+.codex-cursor.json
+curated/
+sessions/
+entries.jsonl
+sessions.jsonl
+
+# The samples/ directory is the exception - those are synthetic and ARE
+# committed for new users to play against. Don't put your real data there.
+!samples/_RAW_PROMPT_LOG.md
+!samples/_raw-codex.md
+!samples/curated/
+!samples/curated/**
+!samples/sessions/
+!samples/sessions/**
+!samples/entries.jsonl
+!samples/sessions.jsonl

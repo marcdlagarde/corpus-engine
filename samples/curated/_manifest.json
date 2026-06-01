@@ -1,0 +1,17 @@
+{
+    "LastRun":  "2026-06-01T12:39:00.6371195-04:00",
+    "TotalRawSources":  1,
+    "TotalEntries":  10,
+    "TotalSessions":  5,
+    "Buckets":  {
+                    "dictations":  2,
+                    "strategy":  4,
+                    "agent-briefs":  3,
+                    "content-ideas":  1
+                },
+    "Unclassified":  6,
+    "MachineExports":  {
+                           "entries.jsonl":  3447,
+                           "sessions.jsonl":  1125
+                       }
+}

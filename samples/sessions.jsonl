@@ -1,0 +1,5 @@
+{"hash":"e7f8a9b0","purpose":"Claude session (pre-cwd capture)","src":"claude","cwd":null,"first":"2026-05-03T08:55:14-04:00","last":"2026-05-03T08:55:14-04:00","count":1,"buckets":{}}
+{"hash":"a2b3c4d5","purpose":"Project: other-thing","src":"other-thing","cwd":"/home/user/projects/other-thing","first":"2026-04-30T11:18:55-04:00","last":"2026-04-30T11:30:22-04:00","count":2,"buckets":{}}
+{"hash":"9b3c4d5e","purpose":"Claude session (pre-cwd capture)","src":"claude","cwd":null,"first":"2026-04-21T20:02:44-04:00","last":"2026-04-21T20:05:18-04:00","count":2,"buckets":{"agent-briefs":1,"dictations":1,"strategy":1}}
+{"hash":"8d4e5f6a","purpose":"Project: sample-app","src":"sample-app","cwd":"/home/user/projects/sample-app","first":"2026-04-14T14:33:12-04:00","last":"2026-04-14T14:45:09-04:00","count":2,"buckets":{"agent-briefs":1,"content-ideas":1,"strategy":1}}
+{"hash":"7a1b2c3d","purpose":"Project: sample-app","src":"sample-app","cwd":"/home/user/projects/sample-app","first":"2026-04-12T09:14:33-04:00","last":"2026-04-12T09:22:07-04:00","count":3,"buckets":{"agent-briefs":1,"dictations":1,"strategy":2}}
