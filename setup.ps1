@@ -79,23 +79,23 @@ Write-Host ""
 Write-Host "1. WIRE THE CLAUDE CODE CAPTURE HOOK" -ForegroundColor Yellow
 Write-Host "   Add this to your ~/.claude/settings.json under the 'hooks' key:"
 Write-Host ""
-$hookSnippet = @"
-   {
-     "hooks": {
-       "UserPromptSubmit": [
-         {
-           "hooks": [
-             {
-               "type": "command",
-               "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$toolsDir\log-prompt.ps1`"",
-               "timeout": 5
-             }
-           ]
-         }
-       ]
-     }
-   }
-"@
+# Generate JSON programmatically so quotes and Windows backslashes are escaped properly
+$hookObj = [ordered]@{
+    hooks = [ordered]@{
+        UserPromptSubmit = @(
+            [ordered]@{
+                hooks = @(
+                    [ordered]@{
+                        type    = 'command'
+                        command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $toolsDir 'log-prompt.ps1')`""
+                        timeout = 5
+                    }
+                )
+            }
+        )
+    }
+}
+$hookSnippet = ($hookObj | ConvertTo-Json -Depth 10) -split "`r?`n" | ForEach-Object { "   $_" } | Out-String
 Write-Host $hookSnippet -ForegroundColor Gray
 Write-Host ""
 Write-Host "   In Claude Code, type /hooks once after editing to reload."
