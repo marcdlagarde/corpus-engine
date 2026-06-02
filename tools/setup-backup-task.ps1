@@ -29,7 +29,9 @@ if (-not (Test-Path $backupScript)) {
     exit 1
 }
 
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$backupScript`""
+# -WindowStyle Hidden + -NonInteractive belt-and-suspenders the no-window behavior;
+# the real reason no window appears is the S4U principal below (no interactive session).
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$backupScript`""
 
 # Trigger: register-time start + 30-minute repetition, indefinite.
 # Pattern: Once trigger as base + post-hoc Repetition assignment so the
@@ -45,7 +47,12 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 5) `
     -MultipleInstances IgnoreNew
 
-$taskPrincipal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+# LogonType S4U ("Service For User"): task runs as the user but without an interactive
+# desktop session — so no console window flashes every 30 min. Tradeoff: the task
+# can't prompt for credentials. Git push relies on cached Windows Credential Manager
+# entries; if those expire, the push fails silently and shows up in the task's
+# "Last Run Result" rather than as a popup.
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType S4U -RunLevel Limited
 
 # Clear any older task name from previous installs.
 Unregister-ScheduledTask -TaskName 'CorpusBackup' -Confirm:$false -ErrorAction SilentlyContinue
