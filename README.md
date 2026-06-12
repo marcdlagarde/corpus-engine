@@ -67,8 +67,12 @@ corpus-engine/
 │   ├── corpus-ask.ps1            # natural-language query via claude -p
 │   ├── backup.ps1                # commit + push (optional, opt-in)
 │   └── setup-backup-task.ps1     # registers 30-min scheduled task (elevated)
-├── samples/
-│   └── _RAW_PROMPT_LOG.md        # synthetic sample for first-run demos
+├── samples/                     # synthetic demo corpus (run the engine against it first)
+│   ├── _RAW_PROMPT_LOG.md        # hand-written sample prompts
+│   ├── entries.jsonl             # machine-readable exports
+│   ├── sessions.jsonl
+│   ├── curated/                  # generated bucket views
+│   └── sessions/                 # generated per-session views
 ├── templates/
 │   └── AGENTS.md                 # installed into your corpus root by setup.ps1
 ├── AGENTS.md                     # instructions for agents working on this engine
