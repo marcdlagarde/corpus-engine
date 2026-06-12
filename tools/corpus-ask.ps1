@@ -31,7 +31,12 @@ param(
     # Trace mode: emits Claude's full event stream (stream-json) so you see
     # every tool call. Useful for confirming the model is using JSONL primary
     # sources. Named -Trace because PowerShell reserves -Verbose.
-    [switch]$Trace
+    [switch]$Trace,
+
+    # By default, refresh entries.jsonl/sessions.jsonl before querying so the
+    # answer includes newly captured Claude prompts and newly imported Codex
+    # history. Use -NoRefresh only when you intentionally want the current files.
+    [switch]$NoRefresh
 )
 
 $q = ($Question -join ' ').Trim()
@@ -45,6 +50,19 @@ if (-not (Test-Path $CorpusRoot)) {
     Write-Host "ERROR: corpus root not found at $CorpusRoot" -ForegroundColor Red
     Write-Host "Run setup.ps1 first, or set `$env:CORPUS_ROOT to your corpus directory." -ForegroundColor Yellow
     exit 1
+}
+
+if (-not $NoRefresh) {
+    $refreshScript = Join-Path $PSScriptRoot 'refresh.ps1'
+    if (Test-Path $refreshScript) {
+        & $refreshScript -CorpusRoot $CorpusRoot
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: corpus refresh failed. Query aborted so results are not stale." -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+    } else {
+        Write-Host "WARN: refresh.ps1 not found. Querying existing JSONL files, which may be stale." -ForegroundColor Yellow
+    }
 }
 
 if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
@@ -91,3 +109,11 @@ if ($Trace) {
 }
 
 & claude @claudeArgs
+$exitCode = $LASTEXITCODE
+if ($exitCode -ne 0) {
+    Write-Host ""
+    Write-Host "corpus-ask could not complete through the Claude CLI." -ForegroundColor Yellow
+    Write-Host "If the error above is a 401, refresh Claude Code authentication and retry." -ForegroundColor Yellow
+    Write-Host "The local JSONL files were refreshed first; agents can still query entries.jsonl and sessions.jsonl directly." -ForegroundColor Yellow
+}
+exit $exitCode

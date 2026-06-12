@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path $PSCommandPath -Parent
 $toolsDir = Join-Path $repoRoot 'tools'
+$templatesDir = Join-Path $repoRoot 'templates'
 
 Write-Host ""
 Write-Host "===== corpus-engine setup =====" -ForegroundColor Cyan
@@ -65,6 +66,19 @@ if (-not (Test-Path $CorpusRoot)) {
     Write-Host "[ OK ] Corpus root already exists at $CorpusRoot" -ForegroundColor Green
 }
 
+# Install corpus-local agent instructions so future Claude/Codex sessions know
+# how to refresh and query entries.jsonl without rediscovering the engine.
+$agentTemplate = Join-Path $templatesDir 'AGENTS.md'
+$agentTarget = Join-Path $CorpusRoot 'AGENTS.md'
+if ((Test-Path $agentTemplate) -and -not (Test-Path $agentTarget)) {
+    $agentText = Get-Content $agentTemplate -Raw
+    $agentText = $agentText.Replace('{{CORPUS_ROOT}}', $CorpusRoot).Replace('{{TOOLS_DIR}}', $toolsDir)
+    [System.IO.File]::WriteAllText($agentTarget, $agentText, [System.Text.UTF8Encoding]::new($false))
+    Write-Host "[ OK ] Installed corpus agent instructions at $agentTarget" -ForegroundColor Green
+} elseif (Test-Path $agentTarget) {
+    Write-Host "[INFO] Corpus agent instructions already exist at $agentTarget" -ForegroundColor Gray
+}
+
 # Run a curation pass against the bundled samples so the user sees the engine work
 $sampleSrc = Join-Path $repoRoot 'samples'
 if (Test-Path $sampleSrc) {
@@ -100,17 +114,14 @@ Write-Host $hookSnippet -ForegroundColor Gray
 Write-Host ""
 Write-Host "   In Claude Code, type /hooks once after editing to reload."
 Write-Host ""
-Write-Host "2. IMPORT YOUR CODEX HISTORY (optional)" -ForegroundColor Yellow
-Write-Host "   If you've used Codex CLI, run:"
-Write-Host "     & '$toolsDir\import-codex-history.ps1' -Verbose"
+Write-Host "2. REFRESH YOUR CORPUS EXPORTS" -ForegroundColor Yellow
+Write-Host "   This imports Codex history if present and regenerates entries.jsonl/sessions.jsonl:"
+Write-Host "     & '$toolsDir\refresh.ps1' -CorpusRoot '$CorpusRoot' -Summary"
 Write-Host ""
-Write-Host "3. RUN CURATION TO BUILD VIEWS" -ForegroundColor Yellow
-Write-Host "   & '$toolsDir\curate.ps1' -CorpusRoot '$CorpusRoot' -Summary"
-Write-Host ""
-Write-Host "4. ASK YOUR CORPUS QUESTIONS" -ForegroundColor Yellow
+Write-Host "3. ASK YOUR CORPUS QUESTIONS" -ForegroundColor Yellow
 Write-Host "   & '$toolsDir\corpus-ask.ps1' `"what are my recurring themes?`""
 Write-Host ""
-Write-Host "5. OPTIONAL: AUTO-BACKUP EVERY 30 MIN" -ForegroundColor Yellow
+Write-Host "4. OPTIONAL: AUTO-BACKUP EVERY 30 MIN" -ForegroundColor Yellow
 Write-Host "   Initialize git in your corpus, then from an ELEVATED PowerShell:"
 Write-Host "     & '$toolsDir\setup-backup-task.ps1'"
 Write-Host ""

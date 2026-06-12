@@ -4,6 +4,7 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+.obsidian/
 
 # Local user state
 *.tmp

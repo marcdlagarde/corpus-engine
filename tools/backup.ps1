@@ -20,13 +20,10 @@ if (-not (Test-Path $corpusRoot)) {
     exit 0
 }
 
-# 1. Sync Codex prompts (no-op if no new entries)
-& (Join-Path $toolsDir 'import-codex-history.ps1') -CorpusRoot $corpusRoot
+# 1. Sync Codex prompts and refresh curated/JSONL views
+& (Join-Path $toolsDir 'refresh.ps1') -CorpusRoot $corpusRoot
 
-# 2. Refresh curated views + session summaries
-& (Join-Path $toolsDir 'curate.ps1') -CorpusRoot $corpusRoot
-
-# 3. Commit + push (only if a git remote is configured)
+# 2. Commit + push (only if a git remote is configured)
 Set-Location $corpusRoot
 if (-not (Test-Path '.git')) {
     # No git repo set up; skip the commit step entirely

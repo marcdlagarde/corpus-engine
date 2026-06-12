@@ -17,8 +17,9 @@ You -> Claude Code or Codex CLI -> this engine -> a queryable record of how you 
 2. **Classifies** them into themed buckets with deterministic heuristics (no LLM calls during classification): `dictations`, `strategy`, `agent-briefs`, `content-ideas`. Buckets are easy to add or rewrite.
 3. **Groups** entries by session and gives each session a heuristic purpose label + bucket distribution + entry list.
 4. **Exports** machine-readable JSONL parallel files (`entries.jsonl`, `sessions.jsonl`) so agents can query the corpus efficiently.
-5. **Lets you ask** the corpus questions in plain English via `corpus-ask.ps1` (wraps `claude -p` with a tight system prompt; cites real timestamps).
-6. **Backs up** to your own private GitHub repo every 30 minutes (optional, opt-in).
+5. **Refreshes before query** with `refresh.ps1`, so `entries.jsonl` and `sessions.jsonl` include new Codex history and newly captured Claude prompts.
+6. **Lets you ask** the corpus questions in plain English via `corpus-ask.ps1` (wraps `claude -p` with a tight system prompt; cites real timestamps).
+7. **Backs up** to your own private GitHub repo every 30 minutes (optional, opt-in).
 
 ---
 
@@ -46,10 +47,11 @@ cd corpus-engine
 The setup script:
 - Verifies prerequisites (PowerShell, `claude` CLI, Codex history)
 - Creates your corpus directory (default: `~\corpus`, override with `$env:CORPUS_ROOT`)
+- Installs `AGENTS.md` into your corpus directory so future Claude/Codex agents know how to refresh and query it
 - Runs a curation pass against the bundled `samples/` so you immediately see real output
 - Prints the manual steps for the Claude Code hook and the optional auto-backup
 
-After setup, the next prompt you submit to Claude Code will land in your corpus. After running the Codex importer, your existing Codex history shows up too.
+After setup, the next prompt you submit to Claude Code will land in your corpus. `corpus-ask.ps1` refreshes the JSONL exports before every query by default, and `refresh.ps1` gives agents a direct way to do the same without using Claude.
 
 ---
 
@@ -60,12 +62,16 @@ corpus-engine/
 ├── tools/
 │   ├── log-prompt.ps1            # Claude Code UserPromptSubmit hook
 │   ├── import-codex-history.ps1  # incremental Codex history.jsonl importer
+│   ├── refresh.ps1               # import Codex + regenerate JSONL/markdown views
 │   ├── curate.ps1                # classify + group + export (the main engine)
 │   ├── corpus-ask.ps1            # natural-language query via claude -p
 │   ├── backup.ps1                # commit + push (optional, opt-in)
 │   └── setup-backup-task.ps1     # registers 30-min scheduled task (elevated)
 ├── samples/
 │   └── _RAW_PROMPT_LOG.md        # synthetic sample for first-run demos
+├── templates/
+│   └── AGENTS.md                 # installed into your corpus root by setup.ps1
+├── AGENTS.md                     # instructions for agents working on this engine
 ├── setup.ps1                     # one-time install
 ├── LICENSE                       # MIT
 └── README.md
@@ -75,6 +81,7 @@ Your corpus root (`~\corpus` by default) ends up structured like this:
 
 ```
 ~\corpus\
+├── AGENTS.md             # tells future agents how to refresh/query this corpus
 ├── _RAW_PROMPT_LOG.md     # Claude Code capture (firehose, append-only)
 ├── _raw-codex.md          # Codex CLI imports
 ├── entries.jsonl          # machine-readable: one entry per line
@@ -93,7 +100,23 @@ Your corpus root (`~\corpus` by default) ends up structured like this:
 
 ---
 
+## Viewing your corpus
+
+Your corpus is plain markdown files on your disk. Any markdown reader works. Three options worth knowing:
+
+**Plain text editor or VS Code preview.** Zero install. VS Code's built-in markdown preview (Ctrl+Shift+V) renders it cleanly with no extra tooling. Fine if you're already editing in VS Code.
+
+**Obsidian** (personal recommendation). Free for personal use. Point it at your corpus folder as a vault and you get a file tree on the left, fast search, wiki-link rendering, and a reading mode (Ctrl+E) that hides the markdown syntax so it reads like a clean doc. Two-click setup. The wiki-link rendering matches the structure `curate.ps1` generates, so cross-references in your sessions and curated views become clickable navigation.
+
+**Terminal + `corpus-ask`.** When you want the answer, not a browse. Fastest path once you already know what you're asking.
+
+Pick what fits how you read. The corpus is the same files either way. The repo's `.gitignore` already blocks `.obsidian/`, so vault config never lands in your private corpus repo.
+
+---
+
 ## Ask the corpus
+
+`corpus-ask.ps1` refreshes `entries.jsonl` and `sessions.jsonl` before it asks, so new Codex history and new Claude hook captures are included. Use `-NoRefresh` only when you intentionally want to query the files exactly as they are.
 
 ```powershell
 .\tools\corpus-ask.ps1 "what are my recurring themes across the last three months?"
@@ -113,16 +136,30 @@ corpus-ask "find threads I started but abandoned"
 
 The model navigates the JSONL exports with grep/Bash, cites specific entry timestamps, stops when done. Each query costs ~1 chunky Claude Code conversation worth of quota.
 
+If Claude CLI auth fails, the local refresh still happened first. You can fix Claude auth and retry, or point another agent at the installed corpus and ask it to follow `AGENTS.md`.
+
 ---
 
 ## For agents (machine-readable)
 
-If you're an LLM or another agent consuming this corpus programmatically, read these two files first instead of parsing the markdown:
+If you're an LLM or another agent consuming this corpus programmatically, refresh first, then read the JSONL. Setup installs an `AGENTS.md` file into the user's corpus root with these instructions and the exact local tool paths.
+
+```powershell
+.\tools\refresh.ps1 -CorpusRoot "$env:USERPROFILE\corpus"
+```
+
+Then read these two files instead of parsing the markdown:
 
 - **`entries.jsonl`** — one entry per line. Schema: `{ts, sess, src, cwd, tags, len, body}`. Filter by `sess` hash, `src` (cwd leaf), `tags` array, or `body` keywords. Stream-friendly.
 - **`sessions.jsonl`** — one session per line. Schema: `{hash, purpose, src, cwd, first, last, count, buckets}`. Small (~tens of KB even at scale); safe to load fully as a manifest.
 
 Markdown files in `curated/` and `sessions/` are derived views of the same data, regenerated by `curate.ps1` each run. The JSONL files are the canonical machine surface.
+
+Direct-agent rule of thumb:
+
+```text
+Read AGENTS.md, run refresh.ps1, read sessions.jsonl, filter entries.jsonl, cite timestamps.
+```
 
 ---
 
