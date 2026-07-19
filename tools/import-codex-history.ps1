@@ -13,8 +13,17 @@
 
 [CmdletBinding()]
 param(
-    [string]$CodexHistory = (Join-Path $env:USERPROFILE '.codex\history.jsonl'),
-    [string]$CorpusRoot = $(if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $env:USERPROFILE 'corpus' })
+    [string]$CodexHistory = $(
+        $h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+        Join-Path $h '.codex/history.jsonl'
+    ),
+    [string]$CorpusRoot = $(
+        if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT }
+        else {
+            $h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+            Join-Path $h 'corpus'
+        }
+    )
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -80,7 +89,10 @@ try {
             $sessionHash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-','').Substring(0,8).ToLower()
         }
 
-        $body = $entry.text
+        # Widen standalone "---" lines so pasted content cannot terminate the
+        # entry early when curate.ps1 parses the raw markdown.
+        $body = ([string]$entry.text -replace '(?m)^[ \t]*-{3}[ \t]*$', '----').Trim()
+        if ([string]::IsNullOrWhiteSpace($body)) { continue }
         [void]$buffer.AppendLine()
         [void]$buffer.AppendLine("## $iso")
         [void]$buffer.AppendLine("> session: $sessionHash")

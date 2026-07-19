@@ -19,7 +19,13 @@
 
 [CmdletBinding()]
 param(
-    [string]$CorpusRoot = $(if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $env:USERPROFILE 'corpus' }),
+    [string]$CorpusRoot = $(
+        if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT }
+        else {
+            $h = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+            Join-Path $h 'corpus'
+        }
+    ),
     [switch]$Summary
 )
 
@@ -54,12 +60,19 @@ foreach ($rf in $rawFiles) {
     $content = Get-Content $rf.Path -Raw -ErrorAction SilentlyContinue
     if ([string]::IsNullOrWhiteSpace($content)) { continue }
 
+    # Terminator anchored to EXACTLY three dashes on their own line: entry
+    # bodies are untrusted text (imported chat history), and the importers
+    # widen embedded "---" lines to "----" so they cannot terminate an entry
+    # early and forge subsequent entries.
     $matches = [regex]::Matches($content,
-        '(?ms)^## (\S+)(?:\r?\n> cwd: ([^\r\n]+))?(?:\r?\n> session: ([^\r\n]+))?\r?\n\r?\n(.+?)(?=\r?\n\r?\n---|\z)')
+        '(?ms)^## (\S+)(?:\r?\n> cwd: ([^\r\n]+))?(?:\r?\n> session: ([^\r\n]+))?\r?\n\r?\n(.+?)(?=\r?\n\r?\n---[ \t]*\r?$|\z)')
     foreach ($m in $matches) {
         $ts      = $m.Groups[1].Value
         $cwd     = if ($m.Groups[2].Success) { $m.Groups[2].Value.Trim() } else { $null }
         $session = if ($m.Groups[3].Success) { $m.Groups[3].Value.Trim() } else { 'pre-session' }
+        # Session becomes a filename under sessions/; never let a parsed value
+        # traverse paths.
+        if ($session -notmatch '^[a-z0-9][a-z0-9\-]{0,63}$') { $session = 'pre-session' }
         $body    = $m.Groups[4].Value.Trim()
         if ([string]::IsNullOrWhiteSpace($body)) { continue }
 
@@ -131,8 +144,12 @@ function Get-Tags {
 function Get-SessionPurpose {
     param($Source, $TopBuckets)
     switch -Regex ($Source) {
-        '^codex$'  { return 'Codex CLI session' }
-        '^claude$' { return 'Claude session (pre-cwd capture)' }
+        '^codex$'     { return 'Codex CLI session' }
+        '^claude$'    { return 'Claude session (pre-cwd capture)' }
+        '^chatgpt$'     { return 'ChatGPT conversation (imported export)' }
+        '^claude-code$' { return 'Claude Code session (imported history, pre-cwd)' }
+        '^claude-ai$' { return 'Claude.ai conversation (imported export)' }
+        '^gemini$'    { return 'Gemini activity (one session per day)' }
         default {
             if ($Source -and $Source -ne 'pre-session') { return "Project: $Source" }
             return 'Ad-hoc / unknown'
@@ -156,7 +173,7 @@ $unclassified = New-Object System.Collections.ArrayList
 $entryTags = @{}
 foreach ($e in $allEntries) {
     $tags = Get-Tags -Entry $e
-    $entryTags[$e.Timestamp] = $tags
+    $entryTags["$($e.Session)|$($e.Timestamp)"] = $tags
     if ($tags.Count -eq 0) {
         [void]$unclassified.Add($e)
         continue
@@ -181,7 +198,7 @@ foreach ($g in $sessionGroups) {
 
     $bucketCounts = @{}
     foreach ($e in $entries) {
-        foreach ($t in $entryTags[$e.Timestamp]) {
+        foreach ($t in $entryTags["$($e.Session)|$($e.Timestamp)"]) {
             if (-not $bucketCounts.ContainsKey($t)) { $bucketCounts[$t] = 0 }
             $bucketCounts[$t]++
         }
@@ -296,7 +313,7 @@ foreach ($hash in $sessionMeta.Keys) {
     foreach ($e in $m.Entries) {
         $preview = if ($e.Body.Length -gt 140) { $e.Body.Substring(0, 140) + '...' } else { $e.Body }
         $preview = $preview -replace '\r?\n', ' '
-        $tagList = ($entryTags[$e.Timestamp] | Sort-Object) -join ', '
+        $tagList = ($entryTags["$($e.Session)|$($e.Timestamp)"] | Sort-Object) -join ', '
         if ([string]::IsNullOrWhiteSpace($tagList)) { $tagList = 'unclassified' }
         $sessionBody += "- **$($e.Timestamp)** [$tagList] $preview`n"
     }
@@ -331,7 +348,7 @@ $sessionsJsonl = Join-Path $CorpusRoot 'sessions.jsonl'
 $entriesWriter = [System.IO.StreamWriter]::new($entriesJsonl, $false, [System.Text.UTF8Encoding]::new($false))
 try {
     foreach ($e in ($allEntries | Sort-Object Timestamp)) {
-        $tagArr = [string[]](@($entryTags[$e.Timestamp]) | Sort-Object)
+        $tagArr = [string[]](@($entryTags["$($e.Session)|$($e.Timestamp)"]) | Sort-Object)
         if ($null -eq $tagArr) { $tagArr = [string[]]@() }
         $rec = [ordered]@{
             ts   = $e.Timestamp

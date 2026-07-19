@@ -15,7 +15,8 @@
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-$corpusRoot = if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $env:USERPROFILE 'corpus' }
+$homeDir = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+$corpusRoot = if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $homeDir 'corpus' }
 $logFile = Join-Path $corpusRoot '_RAW_PROMPT_LOG.md'
 
 try {
@@ -29,6 +30,11 @@ try {
     $json = $raw | ConvertFrom-Json
     $prompt = $json.prompt
     if ([string]::IsNullOrWhiteSpace($prompt)) { exit 0 }
+
+    # A line of only three dashes inside a prompt would terminate the entry
+    # early when curate.ps1 parses the log, letting pasted content forge
+    # entries. Widen to four (still a markdown rule).
+    $prompt = $prompt -replace '(?m)^[ \t]*-{3}[ \t]*$', '----'
 
     # cwd: prefer hook JSON payload value, fall back to process cwd.
     $cwd = if ($json.PSObject.Properties.Name -contains 'cwd' -and -not [string]::IsNullOrWhiteSpace($json.cwd)) {

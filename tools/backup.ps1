@@ -12,7 +12,8 @@
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-$corpusRoot = if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $env:USERPROFILE 'corpus' }
+$homeDir = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+$corpusRoot = if ($env:CORPUS_ROOT) { $env:CORPUS_ROOT } else { Join-Path $homeDir 'corpus' }
 $toolsDir = Split-Path $PSCommandPath -Parent
 
 if (-not (Test-Path $corpusRoot)) {
@@ -33,10 +34,25 @@ if (-not (Test-Path '.git')) {
 $hasRemote = $false
 try { if (git remote 2>$null) { $hasRemote = $true } } catch {}
 
+# The corpus is the user's complete prompt history. If gh is available and
+# positively reports the remote as PUBLIC, refuse to push rather than publish.
+if ($hasRemote -and (Get-Command gh -ErrorAction SilentlyContinue)) {
+    $visibility = ''
+    try { $visibility = (& gh repo view --json visibility --jq '.visibility' 2>$null) } catch {}
+    if ("$visibility" -match '(?i)public') {
+        Write-Host "REFUSING to push: the backup remote is a PUBLIC repo. Your corpus is your full prompt history."
+        Write-Host "Point origin at a private repo (or make this one private), then re-run."
+        exit 1
+    }
+}
+
 git add -A
 if (git status --porcelain) {
     git commit -m "auto-backup $(Get-Date -Format s)" | Out-Null
 }
 if ($hasRemote) {
-    git push 2>$null | Out-Null
+    git push 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Backup push failed (exit $LASTEXITCODE). Run 'git push' inside $corpusRoot to see why; local commits are intact."
+    }
 }

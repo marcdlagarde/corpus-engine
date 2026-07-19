@@ -1,7 +1,7 @@
 # curated/_unclassified.md
 
 > Entries that didn't match any bucket heuristic. Review these to improve `tools/curate.ps1`.
-> Last regenerated: 2026-06-01T12:43:44.6967981-04:00.
+> Last regenerated: 2026-07-18T10:22:36.6305558-04:00.
 
 Entry count: 6
 

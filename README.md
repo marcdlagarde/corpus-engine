@@ -13,7 +13,8 @@ You -> Claude Code or Codex CLI -> this engine -> a queryable record of how you 
 
 ## What it does
 
-1. **Captures** every prompt you submit to Claude Code (via a `UserPromptSubmit` hook) and every prompt you've ever sent to Codex CLI (via its built-in `~/.codex/history.jsonl`).
+1. **Captures** every prompt you submit to Claude Code (via a `UserPromptSubmit` hook), every prompt you've ever sent to Codex CLI (via its built-in `~/.codex/history.jsonl`), and your entire Claude Code back-history (via `~/.claude/history.jsonl` — no waiting for the hook to accumulate).
+1. **Imports** your history from ChatGPT (Desktop/web/mobile), Claude Desktop / claude.ai, and Gemini via each product's official data export — so people who have never touched a CLI still get a full corpus on day one.
 2. **Classifies** them into themed buckets with deterministic heuristics (no LLM calls during classification): `dictations`, `strategy`, `agent-briefs`, `content-ideas`. Buckets are easy to add or rewrite.
 3. **Groups** entries by session and gives each session a heuristic purpose label + bucket distribution + entry list.
 4. **Exports** machine-readable JSONL parallel files (`entries.jsonl`, `sessions.jsonl`) so agents can query the corpus efficiently.
@@ -36,7 +37,17 @@ This engine treats that file (and the Claude Code equivalent) as **source materi
 
 ---
 
-## Quickstart (5 minutes, Windows)
+## Quickstart (Windows, one line)
+
+Open PowerShell (press Win, type `powershell`, Enter) and paste:
+
+```powershell
+irm https://raw.githubusercontent.com/marcdlagarde/corpus-engine/main/install.ps1 | iex
+```
+
+That clones (or downloads — git not required) the repo to `~\corpus-engine`, runs `setup.ps1`, then runs `tools\doctor.ps1`, which tells you exactly which prompt-history sources exist on your machine and how to get the ones that don't. It installs nothing else and only prints the opt-in steps (hook, backup) for you to review.
+
+Prefer to do it by hand? Same thing:
 
 ```powershell
 git clone https://github.com/marcdlagarde/corpus-engine.git
@@ -45,13 +56,50 @@ cd corpus-engine
 ```
 
 The setup script:
-- Verifies prerequisites (PowerShell, `claude` CLI, Codex history)
+- Checks what's available (PowerShell, `claude` CLI — optional, Codex/Claude Code history)
 - Creates your corpus directory (default: `~\corpus`, override with `$env:CORPUS_ROOT`)
 - Installs `AGENTS.md` into your corpus directory so future Claude/Codex agents know how to refresh and query it
 - Runs a curation pass against the bundled `samples/` so you immediately see real output
-- Prints the manual steps for the Claude Code hook and the optional auto-backup
+- Prints the manual steps for the Claude Code hook, the export importers, and the optional auto-backup
 
-After setup, the next prompt you submit to Claude Code will land in your corpus. `corpus-ask.ps1` refreshes the JSONL exports before every query by default, and `refresh.ps1` gives agents a direct way to do the same without using Claude.
+After setup, run `tools\refresh.ps1` once: it backfills everything already on your disk (Codex history + your full Claude Code history). The next prompt you submit to Claude Code lands in your corpus via the hook.
+
+**Mac (experimental):** the importers, curation, and corpus-ask run under [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-macos) (`brew install powershell/tap/powershell`), then:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/marcdlagarde/corpus-engine/main/install.sh | sh
+```
+
+The live capture hook and scheduled backup are still Windows-only; on Mac your Claude Code history is backfilled from `~/.claude/history.jsonl` on every refresh instead.
+
+---
+
+## New to all of this? (ChatGPT / Claude Desktop / Gemini users)
+
+You don't need to be a CLI user to build a corpus. A "CLI" (command-line interface) is just a program you type at instead of click at; the two relevant ones here are **Claude Code** (Anthropic) and **Codex** (OpenAI), and both are optional for getting started.
+
+Your chat apps don't keep a readable history file on your computer — history lives on the vendor's servers. But every vendor lets you export it, and this engine imports all three:
+
+| You use | Get your history | Then import with |
+|---------|------------------|------------------|
+| ChatGPT (Desktop, web, or mobile) | Settings → Data Controls → **Export data** (zip arrives by email) | `tools\import-chatgpt-export.ps1 -ExportPath <the zip>` |
+| Claude Desktop / claude.ai | Settings → Privacy → **Export data** (link arrives by email, all tiers) | `tools\import-claude-export.ps1 -ExportPath <the zip>` |
+| Gemini | [takeout.google.com](https://takeout.google.com) → My Activity → **Gemini Apps** only → format **JSON** | `tools\import-gemini-takeout.ps1 -ExportPath <the zip>` |
+
+Then run `tools\refresh.ps1` and your corpus is live — browse it in any markdown reader, no AI subscription required.
+
+Gemini fine print: the standalone "Gemini" Takeout product exports Gems, *not* chats — it must be My Activity → Gemini Apps. Work/Workspace accounts may have Takeout disabled by the admin, and if "Gemini Apps Activity" was off, there's no history to export.
+
+Want the CLIs too? Official installers:
+
+```powershell
+# Claude Code (Windows)
+irm https://claude.ai/install.ps1 | iex
+# Codex CLI (needs Node.js from nodejs.org)
+npm install -g @openai/codex
+```
+
+Not sure what you have? `tools\doctor.ps1` inventories your machine — CLIs, history files, hook status, even export zips sitting in your Downloads folder — and prints the exact command for each next step.
 
 ---
 
@@ -59,10 +107,18 @@ After setup, the next prompt you submit to Claude Code will land in your corpus.
 
 ```
 corpus-engine/
+├── install.ps1                  # one-line bootstrap (irm ... | iex)
+├── install.sh                   # one-line bootstrap for Mac (experimental)
 ├── tools/
 │   ├── log-prompt.ps1            # Claude Code UserPromptSubmit hook
 │   ├── import-codex-history.ps1  # incremental Codex history.jsonl importer
-│   ├── refresh.ps1               # import Codex + regenerate JSONL/markdown views
+│   ├── import-claude-history.ps1 # incremental ~/.claude/history.jsonl importer (deduped vs hook)
+│   ├── import-chatgpt-export.ps1 # ChatGPT official data-export importer
+│   ├── import-claude-export.ps1  # claude.ai official data-export importer
+│   ├── import-gemini-takeout.ps1 # Google Takeout (Gemini Apps) importer
+│   ├── import-export-common.ps1  # shared helpers for the export importers
+│   ├── doctor.ps1                # read-only preflight: what sources does this machine have?
+│   ├── refresh.ps1               # import Codex + Claude history, regenerate JSONL/markdown views
 │   ├── curate.ps1                # classify + group + export (the main engine)
 │   ├── corpus-ask.ps1            # natural-language query via claude -p
 │   ├── backup.ps1                # commit + push (optional, opt-in)
@@ -75,6 +131,8 @@ corpus-engine/
 │   └── sessions/                 # generated per-session views
 ├── templates/
 │   └── AGENTS.md                 # installed into your corpus root by setup.ps1
+├── tests/
+│   └── run-tests.ps1             # importer + security-regression suite (PS 5.1 and PS 7)
 ├── AGENTS.md                     # instructions for agents working on this engine
 ├── setup.ps1                     # one-time install
 ├── LICENSE                       # MIT
@@ -86,8 +144,12 @@ Your corpus root (`~\corpus` by default) ends up structured like this:
 ```
 ~\corpus\
 ├── AGENTS.md             # tells future agents how to refresh/query this corpus
-├── _RAW_PROMPT_LOG.md     # Claude Code capture (firehose, append-only)
+├── _RAW_PROMPT_LOG.md     # Claude Code live capture (firehose, append-only)
 ├── _raw-codex.md          # Codex CLI imports
+├── _raw-claude-code.md    # Claude Code back-history import (if present)
+├── _raw-chatgpt.md        # ChatGPT export import (if imported)
+├── _raw-claude-ai.md      # claude.ai export import (if imported)
+├── _raw-gemini.md         # Gemini Takeout import (if imported)
 ├── entries.jsonl          # machine-readable: one entry per line
 ├── sessions.jsonl         # machine-readable: one session per line
 ├── curated/               # human-readable views, regenerated each run
@@ -185,13 +247,15 @@ Same pattern for adding entirely new buckets. Each iteration is one edit and one
 - **Your corpus is yours.** This engine writes to a local directory. It does not phone home, does not call any API except the one `corpus-ask` explicitly uses (Anthropic's, via your own `claude` CLI auth).
 - **Never commit your real corpus publicly.** The `.gitignore` in this repo blocks the runtime files by default. If you wire up auto-backup, point it at a **private** GitHub repo.
 - **The hook captures EVERYTHING you submit to Claude Code.** Including passwords pasted by accident, internal company names, anything. Treat the corpus as sensitive. If you're going to use this in a regulated environment, configure a project-specific hook scope instead of the user-global one.
+- **Export zips are your full history.** The ChatGPT/Claude/Takeout zips the importers read contain everything you ever typed into those products. The importers read them in-memory and never extract them to disk, but the zip itself sits wherever you downloaded it — store it somewhere private or delete it after importing.
+- **The one-line installer is readable.** `install.ps1` is ~80 lines and does three things: get the repo, run `setup.ps1`, run `doctor.ps1`. Piping a URL to `iex` is a trust decision. Prefer to inspect first? Save it, read the saved copy, run that same copy: `irm <url> -OutFile install.ps1`, open it, then `.\install.ps1`.
 
 ---
 
 ## What this is NOT
 
 - **Not a product.** No sales, no paid tier, no SaaS.
-- **Not cross-platform yet.** PowerShell-only at v0.1. The classification heuristics and JSONL schema are portable; the capture mechanism needs a Bash equivalent for Mac/Linux. PRs welcome.
+- **Not fully cross-platform yet.** Windows-first. On Mac, the importers, curation, and corpus-ask run under PowerShell 7 (`install.sh`); the live capture hook and the scheduled backup are still Windows-only. Linux untested. PRs welcome.
 - **Not a replacement for proper observability.** This is your *prompt* history, not your *work* history. It doesn't know what code you shipped or what worked.
 - **Not stable yet.** v0.1. Schemas may change. Read the commits.
 
@@ -201,10 +265,11 @@ Same pattern for adding entirely new buckets. Each iteration is one edit and one
 
 Help wanted, especially:
 
-- **Mac/Linux port.** A Bash equivalent of `log-prompt.ps1` + Codex importer. Same JSONL schema.
+- **Mac/Linux hardening.** The pwsh path (`install.sh`) is experimental — real-world testing, a `pwsh`-based capture hook, and a launchd/cron backup equivalent.
+- **Localized Gemini imports.** The Takeout importer assumes the English `Prompted ` activity prefix; a locale prefix table would fix non-English accounts.
 - **Heuristic improvements.** Better default buckets, smarter regex, examples of project-specific configs.
 - **Web UI.** A minimal localhost FastAPI/Express app that renders the corpus and exposes `corpus-ask` as a chat interface.
-- **Tests.** There aren't any. A small sanity suite would be valuable.
+- **Tests.** `tests/run-tests.ps1` covers the importers, curate integration, and security regressions on PS 5.1 and PS 7. Coverage for the hook, backup, and corpus-ask paths would be valuable.
 
 Open an issue, send a PR, or fork it and tell me what you built.
 
