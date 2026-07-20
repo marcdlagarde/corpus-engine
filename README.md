@@ -42,12 +42,12 @@ This engine treats that file (and the Claude Code equivalent) as **source materi
 Open PowerShell (press Win, type `powershell`, Enter) and paste:
 
 ```powershell
-$env:CORPUS_ENGINE_REF = 'v0.2.1'; irm https://raw.githubusercontent.com/marcdlagarde/corpus-engine/v0.2.1/install.ps1 | iex
+irm https://github.com/marcdlagarde/corpus-engine/releases/latest/download/install.ps1 | iex
 ```
 
 That clones (or downloads — git not required) the repo to `~\corpus-engine`, runs `setup.ps1`, then runs `tools\doctor.ps1`, which tells you exactly which prompt-history sources exist on your machine and how to get the ones that don't. It installs nothing else and only prints the opt-in steps (hook, backup) for you to review.
 
-The line is pinned to the `v0.2.1` release tag (protected against rewriting), so it always installs exactly the reviewed code — it can't silently change out from under you. To live on the latest commit instead, drop the `$env:` part and replace both `v0.2.1` with `main`.
+The line serves the installer from the **latest release** and installs the latest release's code — deliberately tagged, reviewed versions, never whatever `main` happened to be at 3am. Release tags are protected against rewriting. To pin an exact version, set `$env:CORPUS_ENGINE_REF = 'v0.2.2'` first; to live on the bleeding edge instead, set it to `'main'`.
 
 Prefer to do it by hand? Same thing:
 
@@ -69,7 +69,7 @@ After setup, run `tools\refresh.ps1` once: it backfills everything already on yo
 **Mac (experimental):** the importers, curation, and corpus-ask run under [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-macos) (`brew install powershell/tap/powershell`), then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/marcdlagarde/corpus-engine/v0.2.1/install.sh | CORPUS_ENGINE_REF=v0.2.1 sh
+curl -fsSL https://github.com/marcdlagarde/corpus-engine/releases/latest/download/install.sh | sh
 ```
 
 The live capture hook and scheduled backup are still Windows-only; on Mac your Claude Code history is backfilled from `~/.claude/history.jsonl` on every refresh instead.

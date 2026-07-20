@@ -1,7 +1,7 @@
 # install.ps1
 # One-line bootstrap for corpus-engine on Windows:
 #
-#   irm https://raw.githubusercontent.com/marcdlagarde/corpus-engine/main/install.ps1 | iex
+#   irm https://github.com/marcdlagarde/corpus-engine/releases/latest/download/install.ps1 | iex
 #
 # What it does (and nothing else):
 #   1. Gets the repo to ~\corpus-engine (git clone if git is available,
@@ -17,26 +17,35 @@
 # beyond that is printed as a manual step for you to review.
 #
 # Override the install location with $env:CORPUS_ENGINE_HOME before running.
-# Pin to a release tag (recommended once tags exist) with $env:CORPUS_ENGINE_REF,
-# e.g. $env:CORPUS_ENGINE_REF = 'v0.2' - installing a tag instead of moving
-# `main` means a later repo compromise cannot change what this line installs.
+# Pin an exact version with $env:CORPUS_ENGINE_REF (e.g. 'v0.2.2'): release
+# tags are protected against rewriting, so a pinned line always installs
+# exactly that reviewed code.
 
 $ErrorActionPreference = 'Stop'
 
 $repoUrl  = 'https://github.com/marcdlagarde/corpus-engine'
-$ref      = if ($env:CORPUS_ENGINE_REF) { $env:CORPUS_ENGINE_REF } else { 'main' }
+
+# PS 5.1 defaults to TLS 1.0 for web requests; GitHub requires 1.2+
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+}
+
+# Install the latest RELEASE by default (deliberately tagged + reviewed code),
+# falling back to main if the API is unreachable. $env:CORPUS_ENGINE_REF
+# overrides with any tag or branch.
+$ref = $env:CORPUS_ENGINE_REF
+if (-not $ref) {
+    try { $ref = (Invoke-RestMethod 'https://api.github.com/repos/marcdlagarde/corpus-engine/releases/latest').tag_name } catch {}
+    if (-not $ref) { $ref = 'main' }
+}
 $homeDir  = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
 $dest     = if ($env:CORPUS_ENGINE_HOME) { $env:CORPUS_ENGINE_HOME } else { Join-Path $homeDir 'corpus-engine' }
 
 Write-Host ""
 Write-Host "===== corpus-engine bootstrap =====" -ForegroundColor Cyan
 Write-Host "Install location: $dest"
+Write-Host "Installing ref:   $ref"
 Write-Host ""
-
-# PS 5.1 defaults to TLS 1.0 for web requests; GitHub requires 1.2+
-if ($PSVersionTable.PSVersion.Major -lt 6) {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-}
 
 $haveGit = [bool](Get-Command git -ErrorAction SilentlyContinue)
 
