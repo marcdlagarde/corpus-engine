@@ -23,6 +23,7 @@ secrets*.json
 _RAW_PROMPT_LOG.md
 _raw-*.md
 .codex-cursor.json
+.claude-history-cursor.json
 curated/
 sessions/
 entries.jsonl
