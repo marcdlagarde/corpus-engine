@@ -42,8 +42,15 @@ $haveGit = [bool](Get-Command git -ErrorAction SilentlyContinue)
 
 if (Test-Path (Join-Path $dest '.git')) {
     if ($haveGit) {
-        Write-Host "Existing clone found - updating..." -ForegroundColor Cyan
-        git -C $dest pull --ff-only
+        $onBranch = git -C $dest symbolic-ref -q HEAD
+        if ($onBranch) {
+            Write-Host "Existing clone found - updating..." -ForegroundColor Cyan
+            git -C $dest pull --ff-only
+        } else {
+            # Tag-pinned clones are detached; there is nothing to pull.
+            Write-Host "Existing clone is pinned to a release tag - leaving it as-is." -ForegroundColor Cyan
+            Write-Host "To install a different version: remove $dest, set `$env:CORPUS_ENGINE_REF, re-run." -ForegroundColor Gray
+        }
     } else {
         Write-Host "Existing clone found at $dest (git not available to update it - continuing as-is)." -ForegroundColor Yellow
     }

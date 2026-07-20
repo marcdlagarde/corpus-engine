@@ -39,8 +39,14 @@ if ! command -v git >/dev/null 2>&1; then
 fi
 
 if [ -d "$DEST/.git" ]; then
-    echo "Existing clone found - updating..."
-    git -C "$DEST" pull --ff-only
+    if git -C "$DEST" symbolic-ref -q HEAD >/dev/null 2>&1; then
+        echo "Existing clone found - updating..."
+        git -C "$DEST" pull --ff-only
+    else
+        # Tag-pinned clones are detached; there is nothing to pull.
+        echo "Existing clone is pinned to a release tag - leaving it as-is."
+        echo "To install a different version: remove $DEST, set CORPUS_ENGINE_REF, re-run."
+    fi
 elif [ -e "$DEST" ]; then
     echo "$DEST exists but is not a corpus-engine clone. Move it aside or set"
     echo "CORPUS_ENGINE_HOME to a different location, then re-run."
